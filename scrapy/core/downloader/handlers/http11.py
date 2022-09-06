@@ -38,8 +38,9 @@ class HTTP11DownloadHandler:
         self._crawler = crawler
 
         from twisted.internet import reactor
-        self._pool = HTTPConnectionPool(reactor, persistent=True)
+        self._pool = HTTPConnectionPool(reactor, persistent=settings.getbool('DOWNLOAD_CONNECTION_IS_PERSISTENT'))
         self._pool.maxPersistentPerHost = settings.getint('CONCURRENT_REQUESTS_PER_DOMAIN')
+        self._pool.cachedConnectionTimeout = settings.getint('DOWNLOAD_IDLE_CONNECTION_TIMEOUT')
         self._pool._factory.noisy = False
 
         self._contextFactory = load_context_factory_from_settings(settings, crawler)
@@ -54,6 +55,9 @@ class HTTP11DownloadHandler:
 
     def download_request(self, request, spider):
         """Return a deferred for the HTTP download"""
+        if ('reset_connections', True) in request.meta:
+            self._pool.closeCachedConnections()
+        
         agent = ScrapyAgent(
             contextFactory=self._contextFactory,
             pool=self._pool,
